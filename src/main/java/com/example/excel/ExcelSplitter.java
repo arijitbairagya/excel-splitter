@@ -6,15 +6,16 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
-import org.apache.logging.log4j.core.util.Assert;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.util.DateFormatConverter;
 import org.apache.poi.xssf.streaming.SXSSFWorkbook;
 import org.apache.poi.xssf.usermodel.XSSFSheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -25,7 +26,9 @@ public class ExcelSplitter {
 	private int maxRows = 1000; // default to thousand
 	private int wbCount = 1;
 	private int totalColumns = 0;
-	private List<String> headerCells = new ArrayList<String>();
+	private List<String> headerValues = new ArrayList<String>();
+	
+	String excelFormatPattern = DateFormatConverter.convert(Locale.ENGLISH, "h:mm:ss AM/PM");
 	
 	private static Logger LOGGER = LogManager.getLogger(ExcelSplitter.class);
 
@@ -67,7 +70,7 @@ public class ExcelSplitter {
 		catch (Exception e) {
 			e.printStackTrace();
 		}
-		System.out.println("COMPLETED...");
+		LOGGER.debug("COMPLETED...");
 	}
 
 
@@ -86,9 +89,9 @@ public class ExcelSplitter {
 
 			// set number of cells per row as it is there in header
 			if(row.getRowNum() == 0) {
-				System.out.println("Number of headers: "+ row.getPhysicalNumberOfCells());
-				row.cellIterator().forEachRemaining( cell -> headerCells.add(cell.getStringCellValue()));
-				System.out.println("Headers:" + headerCells);
+				LOGGER.debug("Number of headers: "+ row.getPhysicalNumberOfCells());
+				row.cellIterator().forEachRemaining( cell -> headerValues.add(cell.getStringCellValue()));
+				LOGGER.debug("Headers:" + headerValues);
 				totalColumns = row.getPhysicalNumberOfCells();
 			}
 
@@ -98,7 +101,7 @@ public class ExcelSplitter {
 			if (rowCount == maxRows+1) {
 				// write the workbook 
 				writeWorkBooks(newWb);
-				System.out.println("Creating New Workbook");
+				LOGGER.debug("Creating New Workbook");
 				newWb = new SXSSFWorkbook();
 				newSheet = newWb.createSheet();
 
@@ -120,13 +123,14 @@ public class ExcelSplitter {
 	private void copyHeader(Sheet sheet) {
 		int col =0;
 		Row headerRow = sheet.createRow(0);
-		for (String cellVal : headerCells) {
+		for (String cellVal : headerValues) {
 			headerRow.createCell(col++).setCellValue(cellVal);
 		}
 	}
 
 	private void copyCellValuebyRow(SXSSFWorkbook newWb, Row newRow, Row row) {
 		Cell newCell;
+		
 		for(int cellCount=0; cellCount < totalColumns; cellCount++) {
 			newCell = newRow.createCell(cellCount);
 			Cell cellVal = row.getCell(cellCount);
@@ -142,6 +146,7 @@ public class ExcelSplitter {
 	 * type of cell it is.
 	 */
 	private void setValue(Cell newCell, Cell cell) {
+		
 		if(cell != null) {
 			switch (cell.getCellType()) {
 			case Cell.CELL_TYPE_STRING: 
@@ -150,6 +155,7 @@ public class ExcelSplitter {
 			case Cell.CELL_TYPE_NUMERIC:
 				if (DateUtil.isCellDateFormatted(cell)) {
 					newCell.setCellValue(cell.getDateCellValue());
+					newCell.setCellStyle(cell.getCellStyle());
 				} else {
 					newCell.setCellValue(cell.getNumericCellValue());
 				}
@@ -164,8 +170,8 @@ public class ExcelSplitter {
 				newCell.setCellValue("");
 				break;
 			default:
-				System.out.println("Could not determine cell type - " + cell.getCellType());
-				System.out.println("Could not determine cell value - " + cell.getStringCellValue());
+				LOGGER.debug("Could not determine cell type - " + cell.getCellType());
+				LOGGER.debug("Could not determine cell value - " + cell.getStringCellValue());
 			}
 		}
 	}
